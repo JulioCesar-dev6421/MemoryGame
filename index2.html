@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rick & Morty PWA</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#202329">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="R&M Memory">
+    <link rel="apple-touch-icon" href="https://uce0cffb3a1a3d05c4069da7f7b7.dl.dropboxusercontent.com/cd/0/inline/C4ScbytDLnLX8oTtxnOfC3_RJmhVCpascHgRmMER4hjWdEYPUdd5Jws3GRvaIKO_Fzgq4EF6SK-ecVlbz2CyEa7B0fsz7AGhiykKKanUwrJc0Gx2hzpaGRi5y0VFLZHQ5QxFCVmJJHBnZdpqGvnzc203/file#">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --portal-green: #97ce4c; }
+        body {
+            background-color: #202329;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: #202329;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s ease-in-out;
+        }
+
+        .portal-wrapper {
+            position: relative;
+            width: 240px;
+            height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .portal-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            animation: portalRotate 10s linear infinite;
+            filter: drop-shadow(0 0 20px #97ce4c);
+        }
+
+        @keyframes portalRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            min-height: 0;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+            height: 100%;
+            max-width: 380px;
+            max-height: 480px;
+        }
+
+        .card { perspective: 1000px; height: 100%; }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 12px;
+            border: 2px solid var(--portal-green);
+        }
+        .card-front {
+            background: #3c3e44 url('https://help.redbubble.com/hc/article_attachments/360002309526/Rick_and_Morty_Logo.png') no-repeat center;
+            background-size: 80%;
+        }
+        .card-back {
+            background: #3c3e44;
+            transform: rotateY(180deg);
+            overflow: hidden;
+        }
+        .card-back img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .matched { 
+            opacity: 0.15; 
+            pointer-events: none; 
+            filter: grayscale(1);
+            border-color: rgba(255,255,255,0.2) !important;
+        }
+
+        /* Botão de Som Ajustado */
+        #audio-toggle {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(151, 206, 76, 0.3);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--portal-green);
+            transition: all 0.2s;
+        }
+        #audio-toggle:active {
+            background: rgba(151, 206, 76, 0.2);
+            transform: scale(0.9);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay" onclick="startGame()">
+        <div class="portal-wrapper">
+            <img src="https://uce0cffb3a1a3d05c4069da7f7b7.dl.dropboxusercontent.com/cd/0/inline/C4ScbytDLnLX8oTtxnOfC3_RJmhVCpascHgRmMER4hjWdEYPUdd5Jws3GRvaIKO_Fzgq4EF6SK-ecVlbz2CyEa7B0fsz7AGhiykKKanUwrJc0Gx2hzpaGRi5y0VFLZHQ5QxFCVmJJHBnZdpqGvnzc203/file#" alt="Portal" class="portal-img">
+            <span class="text-white font-black uppercase text-sm drop-shadow-lg absolute">Entrar</span>
+        </div>
+        <p class="mt-4 text-[#97ce4c] font-bold text-xs animate-pulse uppercase tracking-[0.2em]">Sintonizar Portal</p>
+    </div>
+
+    <header class="text-center py-2 shrink-0 bg-[#202329] z-20">
+        <div class="flex justify-between items-center px-4 mb-2 gap-2">
+            <!-- Botão de Som integrado ao Header -->
+            <button id="audio-toggle" onclick="toggleAudio()" class="invisible">
+                <svg id="icon-sound" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.983 5.983 0 01-1.414 4.243 1 1 0 11-1.415-1.415A3.987 3.987 0 0013 10a3.987 3.987 0 00-1.243-2.828 1 1 0 010-1.415z" clip-rule="evenodd" />
+                </svg>
+            </button>
+
+            <div class="flex gap-2 flex-1 justify-center items-center">
+                <div class="bg-black/60 px-3 py-1 rounded-full border border-white/5 text-[9px] font-bold">
+                    DIM: <span id="lvl-display" class="text-[#97ce4c]">1</span>
+                </div>
+                <h1 class="text-xs font-black text-[#97ce4c] uppercase tracking-tighter whitespace-nowrap">Memory Master</h1>
+                <div class="bg-black/60 px-3 py-1 rounded-full border border-white/5 text-[9px] font-bold">
+                    CLIQ: <span id="c-count" class="text-blue-300">0</span>
+                </div>
+            </div>
+            
+            <!-- Espaçador invisível para manter o título centralizado -->
+            <div class="w-8"></div>
+        </div>
+        <div class="w-full bg-gray-800 h-1">
+            <div id="progress-bar" class="bg-[#97ce4c] h-full transition-all duration-500 shadow-[0_0_10px_#97ce4c]" style="width: 0%"></div>
+        </div>
+    </header>
+
+    <main>
+        <div id="grid"></div>
+    </main>
+
+    <!-- Tela de Vitória -->
+    <div id="win-screen" class="fixed inset-0 flex flex-col items-center justify-center hidden z-50 text-center p-6 bg-black/95 backdrop-blur-md">
+        <h2 class="text-4xl font-black text-[#97ce4c] mb-2">WUBBA LUBBA<br>DUB DUB!</h2>
+        <div class="w-28 h-28 my-8">
+            <img src="https://uce0cffb3a1a3d05c4069da7f7b7.dl.dropboxusercontent.com/cd/0/inline/C4ScbytDLnLX8oTtxnOfC3_RJmhVCpascHgRmMER4hjWdEYPUdd5Jws3GRvaIKO_Fzgq4EF6SK-ecVlbz2CyEa7B0fsz7AGhiykKKanUwrJc0Gx2hzpaGRi5y0VFLZHQ5QxFCVmJJHBnZdpqGvnzc203/file#" class="w-full h-full animate-spin">
+        </div>
+        <button id="next-level-btn" class="bg-[#97ce4c] text-black px-14 py-4 rounded-full font-black uppercase text-sm shadow-[0_0_30px_#97ce4c]">
+            Próximo Salto
+        </button>
+    </div>
+
+    <script>
+        // Assets Audio
+        const THEME_URL = 'https://ucf13b09cc29c9a06735639a83b0.dl.dropboxusercontent.com/cd/0/inline/C4R5r3nrkSkoDGZQQDQ9da-NEFV9tE3z0ysXvpIkfn-ASUy5R-VQdDRGCLOtvp-3udSAfORoA6DxEXo4XWVog6XS6V5-Be2KwH42g6rd3aQ9-hEoAgQ_lRyM-thTgFQKPsoLtnRT8aMVKwfgfqIw1HSi/file#';
+        const FLIP_URL = 'https://uc0c6f65e3a5eb777ce0bfe44162.dl.dropboxusercontent.com/cd/0/inline/C4Set4E1a1rW0UmtVHQuNHlarcJv-eECwAEXmrrSJ4qBkPhngo3TuCFxJrS5CnCLBTMmHfWBTPn4kSiwLfJyuz8j9LHe4BFnKOVt5Csw0ckozsbScKcBaq31bd8aPWvTGtnZSQ-HHH6ygQuQZUI67Cnu/file#';
+        const MATCH_URL = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
+        const WIN_SOUND = 'https://www.myinstants.com/media/sounds/rick-and-morty-wubba-lubba-dub-dub.mp3';
+
+        const audio = {
+            theme: new Audio(THEME_URL),
+            flip: new Audio(FLIP_URL),
+            match: new Audio(MATCH_URL),
+            win: new Audio(WIN_SOUND)
+        };
+
+        audio.theme.loop = true;
+        audio.theme.volume = 0.4;
+
+        let level = 1;
+        let flippedCards = [];
+        let matches = 0;
+        let attempts = 0;
+        let isLock = false;
+        let isMuted = false;
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('icon-sound');
+            if (isMuted) {
+                audio.theme.pause();
+                icon.innerHTML = '<path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" clip-rule="evenodd" /><path stroke="#f00" stroke-width="2" d="M12 7l5 5m0-5l-5 5" />';
+            } else {
+                audio.theme.play();
+                icon.innerHTML = '<path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.983 5.983 0 01-1.414 4.243 1 1 0 11-1.415-1.415A3.987 3.987 0 0013 10a3.987 3.987 0 00-1.243-2.828 1 1 0 010-1.415z" clip-rule="evenodd" />';
+            }
+        }
+
+        function startGame() {
+            if (!isMuted) audio.theme.play().catch(console.error);
+            document.getElementById('overlay').style.opacity = '0';
+            document.getElementById('audio-toggle').classList.remove('invisible');
+            setTimeout(() => {
+                document.getElementById('overlay').style.display = 'none';
+            }, 600);
+            initLevel();
+        }
+
+        async function initLevel() {
+            isLock = true;
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '<div class="col-span-3 flex items-center justify-center text-[#97ce4c] font-black text-xs animate-pulse uppercase">Conectando Dimensão...</div>';
+            
+            matches = 0;
+            flippedCards = [];
+            updateUI();
+
+            try {
+                const page = Math.floor(Math.random() * 42) + 1;
+                const res = await fetch(`https://rickandmortyapi.com/api/character?page=${page}`);
+                const data = await res.json();
+                
+                const selected = data.results.sort(() => 0.5 - Math.random()).slice(0, 6);
+                const deck = [...selected, ...selected].sort(() => 0.5 - Math.random());
+                
+                grid.innerHTML = '';
+                deck.forEach(char => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.dataset.id = char.id;
+                    card.innerHTML = `
+                        <div class="card-inner">
+                            <div class="card-front"></div>
+                            <div class="card-back">
+                                <img src="${char.image}" alt="Card">
+                            </div>
+                        </div>
+                    `;
+                    card.onclick = () => flipCard(card);
+                    grid.appendChild(card);
+                });
+                isLock = false;
+            } catch (e) {
+                grid.innerHTML = '<div class="col-span-3 text-red-500 font-bold">ERRO NO PORTAL</div>';
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('c-count').innerText = attempts;
+            document.getElementById('lvl-display').innerText = level;
+            const progress = (matches / 6) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+
+        function flipCard(card) {
+            if (isLock || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+            if (!isMuted) {
+                audio.flip.currentTime = 0;
+                audio.flip.play().catch(()=>{});
+            }
+
+            card.classList.add('flipped');
+            flippedCards.push(card);
+
+            if (flippedCards.length === 2) {
+                isLock = true;
+                attempts++;
+                
+                const [c1, c2] = flippedCards;
+                if (c1.dataset.id === c2.dataset.id) {
+                    matches++;
+                    updateUI();
+                    
+                    setTimeout(() => {
+                        if (!isMuted) {
+                            audio.match.currentTime = 0;
+                            audio.match.play().catch(()=>{});
+                        }
+                        c1.classList.add('matched');
+                        c2.classList.add('matched');
+                        flippedCards = [];
+                        isLock = false;
+                        
+                        if (matches === 6) {
+                            setTimeout(showWinScreen, 600);
+                        }
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        c1.classList.remove('flipped');
+                        c2.classList.remove('flipped');
+                        flippedCards = [];
+                        isLock = false;
+                        updateUI();
+                    }, 1000);
+                }
+            }
+        }
+
+        function showWinScreen() {
+            if (!isMuted) audio.win.play().catch(()=>{});
+            document.getElementById('win-screen').classList.remove('hidden');
+        }
+
+        document.getElementById('next-level-btn').onclick = () => {
+            level++;
+            document.getElementById('win-screen').classList.add('hidden');
+            initLevel();
+        };
+
+        // Service Worker básico para PWA
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const cacheName = 'rick-memory-v1';
+                self.addEventListener('install', e => {
+                    e.waitUntil(caches.open(cacheName).then(cache => cache.addAll(['./'])));
+                });
+                self.addEventListener('fetch', e => {
+                    e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                });
+            `;
+            const blob = new Blob([swCode], {type: 'application/javascript'});
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl);
+        }
+    </script>
+</body>
+</html>
+
